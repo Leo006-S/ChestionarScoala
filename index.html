@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Chestionar + QR</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;padding:24px;background:#f6f8fb}
+    .card{max-width:780px;margin:0 auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.06)}
+    .row{margin-bottom:12px}
+    #qr {width:200px;height:200px;border:1px solid #eee;display:flex;align-items:center;justify-content:center}
+    button{padding:8px 12px;border-radius:8px;border:0;background:#2563eb;color:#fff;cursor:pointer}
+    button.ghost{background:#e6eefc;color:#0b2b66}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Chestionar de feedback (demo)</h2>
+    <p class="row">Scanează codul QR pentru a deschide formularul pe telefon.</p>
+
+    <!-- QR container -->
+    <div class="row" style="display:flex;gap:16px;align-items:center">
+      <div id="qr"></div>
+      <div>
+        <div style="margin-bottom:8px">URL pentru QR:</div>
+        <input id="urlInput" type="text" style="width:360px;padding:8px;border-radius:8px;border:1px solid #ddd" value="" />
+        <div style="margin-top:8px">
+          <button id="genBtn">Generează QR</button>
+          <button id="dlBtn" class="ghost">Descarcă PNG</button>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Simplu buton pentru a deschide demo form -->
+    <div class="row">
+      <button id="openForm">Deschide formular demo într-o fereastră nouă</button>
+    </div>
+
+    <!-- Container unde vom insera formularul demo pentru test (opțional) -->
+    <div id="formEmbed" style="margin-top:16px"></div>
+  </div>
+
+  <!-- Biblioteca qrcodejs (client-side, minified) -->
+  <script>
+/*!
+ * qrcodejs (minified-ish) - minimal subset to generate QR on a canvas
+ * Based on https://davidshimjs.github.io/qrcodejs/ (lightweight inclusion)
+ * This code implements QR via an offscreen API using a tiny fallback:
+ * If browser supports <canvas>, we will draw the QR image returned by an internal data URL via a simple library.
+ */
+/* Minimal embed: we'll use a lightweight generator via an embedded implementation.
+   For reliability and small size we fallback to using Google Charts if present, but here we implement a simple approach:
+*/
+(function(window){
+  // Use a small external algorithm would be large; instead we'll build QR via an SVG generator service as fallback,
+  // but to be fully client-side we try to use a tiny library approach: we'll create a canvas and draw an image by creating
+  // an SVG via the public API of qrserver: this still requires network. To be fully offline we would need full qrcode alg implementation.
+  // Practical compromise: if offline, display message; otherwise request data:image/svg+xml from qrserver.com and render it.
+  function generateQRToElement(el, text, size){
+    size = size || 200;
+    // Use qrserver API which returns SVG or PNG; this requires network but avoids external JS files.
+    var url = 'https://api.qrserver.com/v1/create-qr-code/?size=' + size + 'x' + size + '&data=' + encodeURIComponent(text) + '&format=png';
+    // Create image
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function(){
+      // clear and append
+      el.innerHTML = '';
+      img.style.width = size + 'px';
+      img.style.height = size + 'px';
+      el.appendChild(img);
+    };
+    img.onerror = function(){
+      el.innerHTML = '<div style="color:#c00;font-size:13px">Eroare generare QR (verifică conexiunea)</div>';
+    };
+    img.src = url;
+  }
+
+  window.SimpleQR = { generate: generateQRToElement };
+})(window);
+  </script>
+
+  <script>
+    const qrEl = document.getElementById('qr');
+    const urlInput = document.getElementById('urlInput');
+    const genBtn = document.getElementById('genBtn');
+    const dlBtn = document.getElementById('dlBtn');
+    const openForm = document.getElementById('openForm');
+    const formEmbed = document.getElementById('formEmbed');
+
+    // Implicit: URL către formular. Dacă ai pus pagina online, modifică aici.
+    // Daca vrei să testezi local, pune un URL public (ex: GitHub Pages). Alte optiuni: data URL (dar scanere mobile pot să nu-l accepte).
+    // Setează valoarea implicită (dacă deschizi local, lasă gol și completează manual cu URL public).
+    urlInput.value = window.location.href; // dacă fișierul este accesibil online, folosește linkul curent
+
+    function generate(){
+      const url = urlInput.value.trim();
+      if(!url){
+        alert('Te rog introdu un URL public (ex: https://username.github.io/repo).');
+        return;
+      }
+      // generează QR
+      SimpleQR.generate(qrEl, url, 200);
+    }
+
+    genBtn.addEventListener('click', generate);
+
+    dlBtn.addEventListener('click', ()=>{
+      const img = qrEl.querySelector('img');
+      if(!img || !img.src){
+        alert('Generează mai întâi codul QR.');
+        return;
+      }
+      // descarcă imaginea PNG (imaginea vine de la qrserver.com cu CORS anon)
+      const a = document.createElement('a');
+      a.href = img.src;
+      a.download = 'chestionar-qr.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+
+    // Demo: încarcă formularul demo (HTML) într-un div pentru test local
+    openForm.addEventListener('click', ()=>{
+      // simplu formular înlined pentru test
+      formEmbed.innerHTML = `
+        <div style="margin-top:12px;padding:12px;border-radius:8px;background:#fbfcff;border:1px solid #eef2ff">
+          <strong>Formular demo</strong>
+          <p style="margin:6px 0">Acesta este un formular demo; în realitate folosește URL din câmpul de mai sus.</p>
+          <label>Nume: <input type="text" /></label>
+        </div>
+      `;
+    });
+
+    // Generează imediat la încărcare dacă există URL
+    window.addEventListener('load', ()=>{
+      if(urlInput.value) generate();
+    });
+  </script>
+</body>
+</html>
